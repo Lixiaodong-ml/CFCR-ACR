@@ -1,0 +1,47 @@
+% Exp06: frozen/refined descriptors and descriptor component ablation.
+% Claim: descriptor components correspond to distinct geometric mismatch modes.
+clc;
+clear;
+11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
+addpath(fileparts(mfilename('fullpath')));
+mech.utils.ensurePaths();
+cfg = mech.utils.defaultConfig();
+cfg.seed = 606;
+cfg.max_iterations = 18;
+out_dir = mech.utils.makeOutputDir(cfg, 'exp06_descriptor_ablation');
+
+variants = { ...
+    'Frozen_full', 'frozen', [1 1 1 1]; ...
+    'Frozen_no_entropy', 'frozen', [1 0 1 1]; ...
+    'Frozen_no_disagreement', 'frozen', [1 1 0 1]; ...
+    'Frozen_no_tail', 'frozen', [1 1 1 0]; ...
+    'Refined_full', 'refined', [1 1 1 1 1]; ...
+    'Refined_no_boundary', 'refined', [1 0 1 1 1]; ...
+    'Refined_no_entropy', 'refined', [1 1 0 1 1]; ...
+    'Refined_no_tail', 'refined', [1 1 1 0 1]; ...
+    'Refined_no_disagreement', 'refined', [1 1 1 1 0] ...
+};
+
+[U, Pi, y] = mech.utils.makeSynthetic('mixed', cfg);
+rows = struct([]);
+for rep = 1:cfg.num_repeats
+    rng(cfg.seed + rep - 1);
+    rep_rows = struct([]);
+    for v = 1:size(variants, 1)
+        name = variants{v, 1};
+        mode = variants{v, 2};
+        mask = variants{v, 3};
+        [Q, ~, ~] = mech.utils.customRecovery(U, mode, mask, cfg, 'hellinger');
+        row_v = mech.utils.scoreConsensus(name, Q, Pi, y, cfg.n_bins);
+        row_v.repeat = rep;
+        if v == 1
+            rep_rows = row_v;
+        else
+            rep_rows(v) = orderfields(row_v, rep_rows);
+        end
+    end
+    rows = [rows, rep_rows]; %#ok<AGROW>
+end
+
+summary_rows = mech.utils.writeRepeatedTables(rows, fullfile(out_dir, 'descriptor_ablation_results.csv'), {'method'});
+disp(struct2table(summary_rows));
